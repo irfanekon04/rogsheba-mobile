@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -50,8 +54,28 @@ abstract final class TelUrls {
 /// that records the URIs.
 typedef OpenExternalUri = Future<bool> Function(Uri uri);
 
-Future<bool> _launchExternal(Uri uri) {
-  return launchUrl(uri, mode: LaunchMode.externalApplication);
+/// Real launcher. [launchUrl] returns `false` for most failures, but on
+/// Android the platform plugin throws `PlatformException(ACTIVITY_NOT_FOUND)`
+/// when no installed app claims the scheme (a fresh emulator with no
+/// browser, an unmapped deep link, etc.). Without this catch the exception
+/// bubbles up as an `Unhandled Exception` and Flutter prints a stack —
+/// the symptom this fix targets.
+///
+/// We swallow the failure and return `false`. A future caller-facing
+/// improvement is to surface a Bangla snackbar when the launch fails; for
+/// now the same `false` return lets the existing widgets continue.
+Future<bool> _launchExternal(Uri uri) async {
+  try {
+    return await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } on PlatformException catch (e, stack) {
+    // Most commonly "ACTIVITY_NOT_FOUND" on Android when no browser /
+    // maps app is installed; also covers `MissingPluginException` (it's
+    // a subtype of PlatformException). Logged only in debug; production
+    // goes silent.
+    debugPrint('launcher_service: failed to launch $uri: $e');
+    debugPrintStack(stackTrace: stack);
+    return false;
+  }
 }
 
 final launcherServiceProvider = Provider<OpenExternalUri>(

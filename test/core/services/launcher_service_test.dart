@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rogsheba_mobile/core/services/launcher_service.dart';
 
@@ -113,5 +115,48 @@ void main() {
       expect(uri.hasQuery, isFalse);
       expect(uri.queryParameters, isEmpty);
     });
+  });
+
+  group('launcherServiceProvider', () {
+    testWidgets(
+      'the production launcher returns false — instead of crashing — when '
+      'the platform channel throws PlatformException',
+      (tester) async {
+        // The bug being regression-tested: on a fresh Android emulator with
+        // no browser installed, tapping "ম্যাপে দেখুন" raises
+        // PlatformException(ACTIVITY_NOT_FOUND) on the url_launcher
+        // channel. The production wrapper must catch that and return false
+        // so the app doesn't print "Unhandled Exception" stack traces.
+        //
+        // We exercise the wrapper by binding the url_launcher channel to a
+        // handler that throws the same exception the platform does. The
+        // production `_launchExternal` then runs the same code path it
+        // would on the device.
+        TestWidgetsFlutterBinding.ensureInitialized();
+        const channel = MethodChannel('plugins.flutter.io/url_launcher');
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'canLaunch') return true;
+          throw PlatformException(
+            code: 'ACTIVITY_NOT_FOUND',
+            message: 'No Activity found to handle intent',
+          );
+        });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, null);
+        });
+
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        final launch = container.read(launcherServiceProvider);
+
+        final result = await launch(
+          MapUrls.osmLocation(lat: 23.8141, lon: 90.4282),
+        );
+
+        expect(result, isFalse);
+      },
+    );
   });
 }
