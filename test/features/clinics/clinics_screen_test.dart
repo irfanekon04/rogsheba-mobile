@@ -6,11 +6,14 @@ import 'package:go_router/go_router.dart';
 import 'package:rogsheba_mobile/app.dart';
 import 'package:rogsheba_mobile/core/l10n/bn_strings.dart';
 import 'package:rogsheba_mobile/core/network/network_providers.dart';
+import 'package:rogsheba_mobile/core/services/connectivity_service.dart';
 import 'package:rogsheba_mobile/core/services/launcher_service.dart';
 import 'package:rogsheba_mobile/core/services/location_service.dart';
 import 'package:rogsheba_mobile/core/services/speech_service.dart';
 import 'package:rogsheba_mobile/core/services/tts_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../helpers/fake_connectivity_service.dart';
 import '../../helpers/fake_dio_adapter.dart';
 import '../../helpers/fake_speech_service.dart';
 import '../../helpers/fake_tts_service.dart';
@@ -87,7 +90,9 @@ Future<FakeDioAdapter> pumpAppWithClinics(
   required Future<ResponseBody> Function(RequestOptions) handler,
   LocateUser? locate,
   OpenExternalUri? launch,
+  FakeConnectivityService? connectivity,
 }) async {
+  SharedPreferences.setMockInitialValues({});
   final adapter = FakeDioAdapter(handler);
   await tester.pumpWidget(
     ProviderScope(
@@ -95,6 +100,9 @@ Future<FakeDioAdapter> pumpAppWithClinics(
         dioProvider.overrideWith((ref) => Dio()..httpClientAdapter = adapter),
         ttsServiceProvider.overrideWithValue(FakeTtsService()),
         speechServiceProvider.overrideWithValue(FakeSpeechService()),
+        connectivityServiceProvider.overrideWithValue(
+          connectivity ?? FakeConnectivityService(),
+        ),
         if (locate != null) locationServiceProvider.overrideWithValue(locate),
         if (launch != null) launcherServiceProvider.overrideWithValue(launch),
       ],

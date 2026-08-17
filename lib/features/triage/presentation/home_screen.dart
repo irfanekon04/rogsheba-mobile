@@ -17,6 +17,7 @@ import 'package:rogsheba_mobile/features/triage/presentation/tts_script.dart';
 import 'package:rogsheba_mobile/shared/widgets/app_button.dart';
 import 'package:rogsheba_mobile/shared/widgets/app_card.dart';
 import 'package:rogsheba_mobile/shared/widgets/app_chip.dart';
+import 'package:rogsheba_mobile/shared/widgets/offline_banner.dart';
 
 /// The home / triage screen, porting the web layout: hero, symptom entry card,
 /// example chips, feature strip and the triage result card. All colours and
@@ -59,66 +60,84 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         actions: const [HotlinePill()],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 768),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _Hero(),
-                  const SizedBox(height: 24),
-                  AppCard(
+        child: Column(
+          children: [
+            // Pinned above the scrollable content so the user sees why a new
+            // request will not work the moment connectivity drops. Hidden
+            // entirely (zero height) when online, so it never shifts the
+            // layout for connected users.
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 768),
+                child: const OfflineBanner(),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 768),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _VoiceSymptomField(
-                          onChanged: controller.onSymptomsChanged,
-                          onSubmitted: controller.submit,
+                        const _Hero(),
+                        const SizedBox(height: 24),
+                        AppCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _VoiceSymptomField(
+                                onChanged: controller.onSymptomsChanged,
+                                onSubmitted: controller.submit,
+                              ),
+                              const SizedBox(height: 16),
+                              AppButton(
+                                label: state.isSubmitting
+                                    ? BnStrings.submitting
+                                    : BnStrings.submit,
+                                isLoading: state.isSubmitting,
+                                onPressed: state.canSubmit
+                                    ? controller.submit
+                                    : null,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                BnStrings.inlineDisclaimer,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: scheme.onSurfaceVariant),
+                              ),
+                              if (state.errorMessage != null) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                  state.errorMessage!,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(color: scheme.error),
+                                ),
+                              ],
+                              if (state.result == null && !state.isSubmitting)
+                                const _ExampleChips(),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 16),
-                        AppButton(
-                          label: state.isSubmitting
-                              ? BnStrings.submitting
-                              : BnStrings.submit,
-                          isLoading: state.isSubmitting,
-                          onPressed: state.canSubmit ? controller.submit : null,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          BnStrings.inlineDisclaimer,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
-                        if (state.errorMessage != null) ...[
-                          const SizedBox(height: 12),
-                          Text(
-                            state.errorMessage!,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: scheme.error),
+                        if (state.result == null && !state.isSubmitting) ...[
+                          const SizedBox(height: 32),
+                          const _FeatureStrip(),
+                        ],
+                        if (state.result != null) ...[
+                          const SizedBox(height: 24),
+                          KeyedSubtree(
+                            key: _resultKey,
+                            child: TriageResultCard(result: state.result!),
                           ),
                         ],
-                        if (state.result == null && !state.isSubmitting)
-                          const _ExampleChips(),
                       ],
                     ),
                   ),
-                  if (state.result == null && !state.isSubmitting) ...[
-                    const SizedBox(height: 32),
-                    const _FeatureStrip(),
-                  ],
-                  if (state.result != null) ...[
-                    const SizedBox(height: 24),
-                    KeyedSubtree(
-                      key: _resultKey,
-                      child: TriageResultCard(result: state.result!),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );

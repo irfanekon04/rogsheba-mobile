@@ -49,6 +49,25 @@ class TriageResult {
 
   final String createdAt;
 
+  /// Mirror of [TriageResult.fromJson]: round-trips the cached JSON exactly.
+  ///
+  /// Note the deliberate absence of any symptom text — the model only carries
+  /// what the API returned, so serialising it can never persist what the user
+  /// typed. That is what the offline slice's storage assertion leans on.
+  Map<String, dynamic> toJson() {
+    return {
+      'level': level.name.toUpperCase(),
+      'title_bn': titleBn,
+      'summary_bn': summaryBn,
+      'advice_bn': adviceBn,
+      'warning_signs_bn': warningSignsBn,
+      'followup_question_bn': followupQuestionBn,
+      'disclaimer_bn': disclaimerBn,
+      'emergency_number': emergencyNumber,
+      'created_at': createdAt,
+    };
+  }
+
   static List<String> _asStringList(Object? value) {
     if (value is! List) return const [];
     return value.whereType<String>().toList(growable: false);

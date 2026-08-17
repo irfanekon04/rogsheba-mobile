@@ -126,4 +126,11 @@ abstract final class BnStrings {
   /// API failure inside the sheet; retry pill sits below it.
   static const emergencyLoadFailed =
       'জরুরি নম্বর লোড করা যায়নি। আবার চেষ্টা করুন।';
+
+  // ---- Offline (Issue #11) ----
+  /// Banner shown while there is no connectivity, so the user understands why
+  /// a fresh request will not work. The web has no offline copy — this is
+  /// written in the same plain Bangla register as the rest of the app.
+  static const offlineBanner =
+      'ইন্টারনেট সংযোগ নেই — নতুন অনুরোধ পাঠানো যাবে না।';
 }

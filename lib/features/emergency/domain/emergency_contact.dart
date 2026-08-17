@@ -29,6 +29,16 @@ class EmergencyContact {
   /// support | fire`). Unused by the v1 chrome but kept so future styling can
   /// branch on it without re-decoding the JSON.
   final String? type;
+
+  /// Mirror of [EmergencyContact.fromJson], used by `CacheService` to persist
+  /// the hotline list for offline rendering.
+  Map<String, dynamic> toJson() {
+    return {
+      'label_bn': labelBn,
+      'number': number,
+      if (type != null) 'type': type,
+    };
+  }
 }
 
 /// Envelope for the `data.contacts` array returned by `/emergency` — also
