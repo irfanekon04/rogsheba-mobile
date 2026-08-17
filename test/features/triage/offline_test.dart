@@ -198,7 +198,10 @@ void main() {
       );
       final json = result.toJson();
       expect(json.containsKey('symptoms'), isFalse);
-      expect(json.values.map((v) => '$v').join(), isNot(contains('গলা ব্যথা আর জ্বর')));
+      expect(
+        json.values.map((v) => '$v').join(),
+        isNot(contains('গলা ব্যথা আর জ্বর')),
+      );
     },
   );
 }

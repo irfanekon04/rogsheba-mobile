@@ -401,21 +401,26 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
     final listening = _isListening;
     return Tooltip(
       message: listening ? BnStrings.stopListening : BnStrings.micLabel,
-      child: InkWell(
-        onTap: _toggleListening,
-        customBorder: const CircleBorder(),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: listening ? scheme.error : scheme.primaryContainer,
-          ),
-          child: Icon(
-            listening ? Icons.stop : Icons.mic,
-            size: 22,
-            color: listening ? scheme.onError : scheme.onPrimaryContainer,
+      child: Semantics(
+        button: true,
+        label: listening ? BnStrings.stopListening : BnStrings.micLabel,
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: _toggleListening,
+          customBorder: const CircleBorder(),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: listening ? scheme.error : scheme.primaryContainer,
+            ),
+            child: Icon(
+              listening ? Icons.stop : Icons.mic,
+              size: 22,
+              color: listening ? scheme.onError : scheme.onPrimaryContainer,
+            ),
           ),
         ),
       ),
@@ -715,7 +720,10 @@ class _SpeakButtonState extends ConsumerState<_SpeakButton> {
         size: 20,
       ),
       label: Text(_isSpeaking ? BnStrings.ttsStop : BnStrings.ttsListen),
-      style: TextButton.styleFrom(foregroundColor: scheme.primary),
+      style: TextButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        foregroundColor: scheme.primary,
+      ),
     );
   }
 }
@@ -794,8 +802,10 @@ class _ClinicsCtaButton extends StatelessWidget {
           child: InkWell(
             onTap: () => context.go('/clinics'),
             borderRadius: BorderRadius.circular(AppRadius.xxxl),
-            child: Padding(
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 48),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              alignment: Alignment.center,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

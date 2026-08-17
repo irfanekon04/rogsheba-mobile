@@ -133,4 +133,9 @@ abstract final class BnStrings {
   /// written in the same plain Bangla register as the rest of the app.
   static const offlineBanner =
       'ইন্টারনেট সংযোগ নেই — নতুন অনুরোধ পাঠানো যাবে না।';
+
+  // ---- Accessibility (Issue #12) ----
+  /// Screen-reader label for the emergency pill. The visible `৯৯৯` alone is
+  /// cryptic when read aloud — say what it is and what it does.
+  static const hotlinePillLabel = 'জরুরি নম্বর ৯৯৯ — খুলুন';
 }

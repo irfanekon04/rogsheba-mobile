@@ -389,7 +389,10 @@ void main() {
       // User re-grants location and taps retry. Both the location outcome
       // and the API response flip.
       grant = true;
-      await tester.tap(find.text(BnStrings.retry));
+      final retry = find.text(BnStrings.retry);
+      await tester.ensureVisible(retry);
+      await tester.pumpAndSettle();
+      await tester.tap(retry);
       await tester.pumpAndSettle();
 
       // Banner gone, located list up.
