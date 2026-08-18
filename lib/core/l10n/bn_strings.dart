@@ -138,4 +138,26 @@ abstract final class BnStrings {
   /// Screen-reader label for the emergency pill. The visible `৯৯৯` alone is
   /// cryptic when read aloud — say what it is and what it does.
   static const hotlinePillLabel = 'জরুরি নম্বর ৯৯৯ — খুলুন';
+
+  // ---- Permission rationale (Issue #13) ----
+  /// Shown once before the first microphone system prompt. Plain Bangla, in
+  /// the app's register, explaining what the mic does and what it does not do.
+  static const micRationaleTitle = 'মাইক্রোফোন ব্যবহার';
+  static const micRationaleBody =
+      'বাংলায় কথা বলে লক্ষণ লিখতে মাইক্রোফোন ব্যবহার হয়। '
+      'আপনার কথা কোথাও সংরক্ষণ করা হয় না — শুধু লেখায় রূপান্তরিত হয়।';
+  static const locationRationaleTitle = 'লোকেশন ব্যবহার';
+  static const locationRationaleBody =
+      'নিকটস্থ ক্লিনিক দেখাতে আপনার অবস্থান ব্যবহার হয়। '
+      'অবস্থান কোথাও সংরক্ষণ করা হয় না — শুধু এই খোঁজের জন্য।';
+  static const rationaleContinue = 'চালিয়ে যান';
+  static const rationaleCancel = 'পরে';
+
+  /// Settings-route affordance shown after a permission denial, so the user
+  /// who changed their mind can reach the OS settings screen.
+  static const openSettings = 'সেটিংসে যান';
+
+  /// Inline note under the symptom field when the mic permission was denied —
+  /// typing stays fully functional.
+  static const micPermissionDenied = 'মাইক্রোফোন অনুমতি নেই — টাইপ করে লিখুন।';
 }

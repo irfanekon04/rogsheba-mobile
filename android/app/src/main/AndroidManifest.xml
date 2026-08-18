@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Network access for the RogSheba API and OpenStreetMap links. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Microphone for Bangla voice symptom input (#5). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- Fine location for the nearby-clinics slice (#8). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>

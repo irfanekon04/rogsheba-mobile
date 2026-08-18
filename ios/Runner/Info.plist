@@ -28,6 +28,10 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>নিকটস্থ ক্লিনিক দেখাতে আপনার অবস্থান ব্যবহার করা হয়।</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>বাংলায় কথা বলে লক্ষণ লিখতে মাইক্রোফোন ব্যবহার করা হয়। আপনার কথা কোথাও সংরক্ষণ করা হয় না।</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>বাংলায় আপনার কথা লেখায় রূপান্তরিত করতে স্পিচ রিকগনিশন ব্যবহার করা হয়।</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

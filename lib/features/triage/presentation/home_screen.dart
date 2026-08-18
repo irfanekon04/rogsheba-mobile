@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:rogsheba_mobile/core/l10n/bn_strings.dart';
+import 'package:rogsheba_mobile/core/services/permission_service.dart';
 import 'package:rogsheba_mobile/core/services/speech_service.dart';
 import 'package:rogsheba_mobile/core/services/tts_service.dart';
 import 'package:rogsheba_mobile/core/theme/app_theme.dart';
@@ -18,6 +19,7 @@ import 'package:rogsheba_mobile/shared/widgets/app_button.dart';
 import 'package:rogsheba_mobile/shared/widgets/app_card.dart';
 import 'package:rogsheba_mobile/shared/widgets/app_chip.dart';
 import 'package:rogsheba_mobile/shared/widgets/offline_banner.dart';
+import 'package:rogsheba_mobile/shared/widgets/permission_rationale_dialog.dart';
 
 /// The home / triage screen, porting the web layout: hero, symptom entry card,
 /// example chips, feature strip and the triage result card. All colours and
@@ -244,6 +246,7 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
 
   /// Captured in [initState]; must not be read through `ref` in [dispose].
   late final SpeechService _speech;
+  late final PermissionService _permission;
   StreamSubscription<SpeechTranscript>? _subscription;
 
   /// `null` while the capability check is in flight.
@@ -251,18 +254,45 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
   bool _isListening = false;
   String _interim = '';
 
+  /// True once the user has permanently denied the mic (deniedForever on
+  /// Android, denied after a re-check on iOS) — the settings route is offered.
+  bool _micDenied = false;
+
   @override
   void initState() {
     super.initState();
     _speech = ref.read(speechServiceProvider);
+    _permission = ref.read(permissionServiceProvider);
     _pulse = AnimationController(vsync: this, duration: _pulseDuration);
     _text.addListener(_notifyChanged);
     _checkVoiceAvailable();
   }
 
   Future<void> _checkVoiceAvailable() async {
-    final available = await _speech.supportsBangla();
-    if (mounted) setState(() => _voiceAvailable = available);
+    final mic = await _permission.microphoneStatus();
+    switch (mic) {
+      case PermissionState.granted:
+        final available = await _speech.supportsBangla();
+        if (mounted) setState(() => _voiceAvailable = available);
+      case PermissionState.notDetermined:
+        // Not yet asked: leave the mic shown optimistically; the rationale
+        // dialog gates the first prompt on tap.
+        break;
+      case PermissionState.denied:
+      case PermissionState.deniedForever:
+      case PermissionState.restricted:
+        // Already denied: don't re-probe (a probe would re-prompt). Offer the
+        // settings route if the rationale was ever accepted, otherwise keep the
+        // mic shown so a tap can present the rationale and re-request.
+        final store = await ref.read(permissionRationaleStoreProvider.future);
+        final accepted = await store.micAccepted();
+        if (accepted && mounted) {
+          setState(() {
+            _voiceAvailable = false;
+            _micDenied = true;
+          });
+        }
+    }
   }
 
   void _notifyChanged() => widget.onChanged(_text.text);
@@ -270,9 +300,64 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
   Future<void> _toggleListening() async {
     if (_isListening) {
       await _stopListening();
-    } else {
-      await _startListening();
+      return;
     }
+    final mic = await _permission.microphoneStatus();
+    if (mic == PermissionState.granted) {
+      await _ensureAvailableAndStart();
+      return;
+    }
+    final store = await ref.read(permissionRationaleStoreProvider.future);
+    if (!await store.micAccepted()) {
+      // First contact with the mic: present the rationale before any OS
+      // prompt. Android maps "never asked" to `denied`, so this must be
+      // decided by the persisted flag, not the raw status.
+      if (!mounted) return;
+      final ok = await showPermissionRationaleDialog(
+        context,
+        title: BnStrings.micRationaleTitle,
+        body: BnStrings.micRationaleBody,
+      );
+      if (!ok || !mounted) return;
+      await store.markMicAccepted();
+      // The OS prompt now follows (triggered inside the recogniser probe).
+      await _ensureAvailableAndStart();
+      return;
+    }
+    // Rationale was already accepted, so a non-granted status means the user
+    // denied the OS prompt earlier — offer the settings route instead of
+    // re-prompting. iOS reports a never-asked mic as `denied`, so
+    // `notDetermined` here still means "not yet prompted".
+    if (mic == PermissionState.notDetermined) {
+      await _ensureAvailableAndStart();
+      return;
+    }
+    if (!mounted) return;
+    final open = await showPermissionSettingsDialog(
+      context,
+      title: BnStrings.micRationaleTitle,
+      body: BnStrings.micPermissionDenied,
+    );
+    if (open && mounted) await _permission.openAppSettings();
+  }
+
+  /// Requests the microphone only when the recogniser is truly available.
+  Future<void> _ensureAvailableAndStart() async {
+    if (_voiceAvailable == null) {
+      final available = await _speech.supportsBangla();
+      if (!mounted) return;
+      setState(() => _voiceAvailable = available);
+      if (!available) {
+        // `false` means bn-BD is missing OR the OS prompt was just denied.
+        final mic = await _permission.microphoneStatus();
+        if (mic != PermissionState.granted && mounted) {
+          setState(() => _micDenied = true);
+        }
+        return;
+      }
+    }
+    if (_voiceAvailable != true) return;
+    await _startListening();
   }
 
   Future<void> _startListening() async {
@@ -356,7 +441,7 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
                     icon: const Icon(Icons.close),
                     onPressed: _clear,
                   ),
-                if (_voiceAvailable ?? true) _buildMicButton(),
+                if (!_micDenied && (_voiceAvailable ?? true)) _buildMicButton(),
               ],
             ),
           ),
@@ -381,7 +466,27 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
               ],
             ),
           ),
-        if (_voiceAvailable == false)
+        if (_micDenied)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    BnStrings.micPermissionDenied,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _permission.openAppSettings(),
+                  child: const Text(BnStrings.openSettings),
+                ),
+              ],
+            ),
+          )
+        else if (_voiceAvailable == false)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
