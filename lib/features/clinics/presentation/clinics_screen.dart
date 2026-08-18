@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:rogsheba_mobile/core/l10n/bn_strings.dart';
 import 'package:rogsheba_mobile/core/services/launcher_service.dart';
+import 'package:rogsheba_mobile/core/services/permission_service.dart';
 import 'package:rogsheba_mobile/core/theme/app_theme_tokens.dart';
 import 'package:rogsheba_mobile/features/clinics/domain/clinic.dart';
 import 'package:rogsheba_mobile/features/clinics/presentation/clinics_controller.dart';
 import 'package:rogsheba_mobile/features/emergency/presentation/hotline_pill.dart';
 import 'package:rogsheba_mobile/shared/widgets/app_card.dart';
+import 'package:rogsheba_mobile/shared/widgets/permission_rationale_dialog.dart';
 
 /// The clinics screen, faithful to the web component: locating + loading
 /// waiting states, the nearest-first facility list with distance chips and
@@ -27,11 +29,45 @@ class _ClinicsScreenState extends ConsumerState<ClinicsScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => ref
-          .read(clinicsControllerProvider.notifier)
-          .locateAndLoad(),
-    );
+    Future.microtask(_ensureLocationThenLoad);
+  }
+
+  /// Gates the auto-locate with the permission rationale: the geolocator's
+  /// `requestPermission` would otherwise fire the OS prompt with no preamble.
+  /// Once the rationale has been accepted (persisted), a later visit proceeds
+  /// straight to `locateAndLoad`, which re-prompts only if the OS status is
+  /// still undecided. A prior denial skips the OS entirely and loads the
+  /// fallback list with the denied banner (and its settings route).
+  Future<void> _ensureLocationThenLoad() async {
+    final permission = ref.read(permissionServiceProvider);
+    final notifier = ref.read(clinicsControllerProvider.notifier);
+    switch (await permission.locationStatus()) {
+      case PermissionState.granted:
+        await notifier.locateAndLoad();
+      case PermissionState.notDetermined:
+        final store = await ref.read(permissionRationaleStoreProvider.future);
+        if (!await store.locationAccepted()) {
+          if (!mounted) return;
+          final ok = await showPermissionRationaleDialog(
+            context,
+            title: BnStrings.locationRationaleTitle,
+            body: BnStrings.locationRationaleBody,
+          );
+          if (!ok) {
+            // Declined: load the curated Dhaka list without any OS prompt.
+            await notifier.loadFallback();
+            return;
+          }
+          await store.markLocationAccepted();
+        }
+        await notifier.locateAndLoad();
+      case PermissionState.denied:
+      case PermissionState.deniedForever:
+      case PermissionState.restricted:
+        // Already denied: never re-prompt. Load the fallback list; the banner
+        // offers the settings route.
+        await notifier.loadFallback();
+    }
   }
 
   @override
@@ -80,14 +116,28 @@ class _ClinicsScreenState extends ConsumerState<ClinicsScreen> {
                         ),
                         if (state.usingFallback) ...[
                           const SizedBox(height: 16),
-                          Center(
-                            child: _PillButton(
-                              label: BnStrings.retry,
-                              filled: false,
-                              onPressed: () => ref
-                                  .read(clinicsControllerProvider.notifier)
-                                  .locateAndLoad(),
-                            ),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _PillButton(
+                                label: BnStrings.retry,
+                                filled: false,
+                                onPressed: () => ref
+                                    .read(clinicsControllerProvider.notifier)
+                                    .locateAndLoad(),
+                              ),
+                              if (state.permissionDenied)
+                                _PillButton(
+                                  label: BnStrings.openSettings,
+                                  filled: false,
+                                  icon: Icons.settings_outlined,
+                                  onPressed: () => ref
+                                      .read(permissionServiceProvider)
+                                      .openAppSettings(),
+                                ),
+                            ],
                           ),
                         ],
                       ],

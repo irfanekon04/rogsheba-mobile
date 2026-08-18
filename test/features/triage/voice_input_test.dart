@@ -6,12 +6,14 @@ import 'package:rogsheba_mobile/app.dart';
 import 'package:rogsheba_mobile/core/l10n/bn_strings.dart';
 import 'package:rogsheba_mobile/core/network/network_providers.dart';
 import 'package:rogsheba_mobile/core/services/connectivity_service.dart';
+import 'package:rogsheba_mobile/core/services/permission_service.dart';
 import 'package:rogsheba_mobile/core/services/speech_service.dart';
 import 'package:rogsheba_mobile/core/services/tts_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/fake_connectivity_service.dart';
 import '../../helpers/fake_dio_adapter.dart';
+import '../../helpers/fake_permission_service.dart';
 import '../../helpers/fake_speech_service.dart';
 import '../../helpers/fake_tts_service.dart';
 import '../../helpers/fixtures.dart';
@@ -20,6 +22,7 @@ void main() {
   Future<FakeSpeechService> pumpApp(
     WidgetTester tester, {
     bool voiceAvailable = true,
+    FakePermissionService? permission,
   }) async {
     SharedPreferences.setMockInitialValues({});
     final speech = FakeSpeechService(banglaAvailable: voiceAvailable);
@@ -27,6 +30,9 @@ void main() {
       ProviderScope(
         overrides: [
           speechServiceProvider.overrideWithValue(speech),
+          permissionServiceProvider.overrideWithValue(
+            permission ?? FakePermissionService(),
+          ),
           ttsServiceProvider.overrideWithValue(FakeTtsService()),
           connectivityServiceProvider.overrideWithValue(
             FakeConnectivityService(),

@@ -51,6 +51,11 @@ class ClinicsViewState {
   /// position to send. The banner above the list is non-optional in v1.
   bool get usingFallback =>
       phase == ClinicsPhase.ready && userLat == null && userLon == null;
+
+  /// The fallback was caused by a denied location permission (rather than
+  /// disabled services or a failed lookup), so the screen offers a settings
+  /// route in addition to retry.
+  bool get permissionDenied => fallbackReason == BnStrings.fallbackBannerDenied;
 }
 
 /// Drives the clinics screen: locate on open, then fetch nearby facilities.
@@ -76,20 +81,43 @@ class ClinicsController extends Notifier<ClinicsViewState> {
     };
 
     final granted = location is LocationGranted;
+    await _fetchNearby(
+      lat: granted ? location.lat : null,
+      lon: granted ? location.lon : null,
+      fallbackBanner: fallbackBanner,
+    );
+  }
 
+  /// Loads the curated Dhaka fallback list directly, without asking the OS
+  /// for a position — used when permission is already denied (or the rationale
+  /// was declined) so no system prompt fires. Renders the denied banner so the
+  /// screen can offer the settings route.
+  Future<void> loadFallback() async {
+    state = const ClinicsViewState();
+    await _fetchNearby(
+      lat: null,
+      lon: null,
+      fallbackBanner: BnStrings.fallbackBannerDenied,
+    );
+  }
+
+  Future<void> _fetchNearby({
+    required double? lat,
+    required double? lon,
+    required String? fallbackBanner,
+  }) async {
     // Both paths go through /clinics: granted sends lat/lon, the others
     // omit them and get the server's curated Dhaka list back.
     state = ClinicsViewState(
       phase: ClinicsPhase.loading,
-      userLat: granted ? location.lat : null,
-      userLon: granted ? location.lon : null,
+      userLat: lat,
+      userLon: lon,
     );
 
     try {
-      final data = await ref.read(clinicsRepositoryProvider).fetchNearby(
-            lat: granted ? location.lat : null,
-            lon: granted ? location.lon : null,
-          );
+      final data = await ref.read(
+        clinicsRepositoryProvider,
+      ).fetchNearby(lat: lat, lon: lon);
       // The server already sorts by distance, but re-sort client-side like
       // the web does so "nearest first" holds even past a reordering proxy.
       final sorted = [...data.clinics]
@@ -98,12 +126,12 @@ class ClinicsController extends Notifier<ClinicsViewState> {
       // The source field is authoritative: even if the caller thought it
       // had coordinates, an empty/fallback server response should still
       // surface as the fallback UX, not as a "we located you" empty list.
-      final isFallback = data.source == 'fallback' || !granted;
+      final isFallback = data.source == 'fallback' || lat == null;
 
       state = ClinicsViewState(
         phase: ClinicsPhase.ready,
-        userLat: granted ? location.lat : null,
-        userLon: granted ? location.lon : null,
+        userLat: lat,
+        userLon: lon,
         fallbackReason: isFallback ? fallbackBanner : null,
         clinics: sorted,
       );
