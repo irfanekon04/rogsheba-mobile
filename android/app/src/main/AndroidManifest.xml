@@ -6,6 +6,14 @@
     <!-- Fine location for the nearby-clinics slice (#8). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Required since targetSdk 30: without this package-visibility entry the
+         app cannot see/bind to the system speech recognizer, so
+         SpeechToText.listen() fails on Android 11+. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
     <application
         android:label="RogSheba"
         android:name="${applicationName}"

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -43,6 +44,9 @@ class FlutterSpeechService implements SpeechService {
   FlutterSpeechService({SpeechToText? speech})
       : _speech = speech ?? SpeechToText();
 
+  /// Upper bound for the locale probe in [supportsBangla].
+  static const Duration _localeProbeTimeout = Duration(seconds: 2);
+
   final SpeechToText _speech;
   final StreamController<SpeechTranscript> _controller =
       StreamController<SpeechTranscript>.broadcast();
@@ -57,20 +61,46 @@ class FlutterSpeechService implements SpeechService {
   bool get isListening => _listening;
 
   Future<bool> _initialize() async {
-    return _initWorked ??= await _speech.initialize();
+    if (_initWorked != null) return _initWorked!;
+    debugPrint('STT: initialize() starting');
+    final ok = await _speech.initialize(
+      onError: (e) => debugPrint('STT: error ${e.errorMsg}'),
+      onStatus: (s) => debugPrint('STT: status $s'),
+    );
+    debugPrint('STT: initialize() -> $ok');
+    _initWorked = ok;
+    return ok;
   }
 
   @override
   Future<bool> supportsBangla() async {
     if (!await _initialize()) return false;
-    final locales = await _speech.locales();
-    return locales.any((l) => l.localeId.toLowerCase().startsWith('bn'));
+    try {
+      final locales = await _speech.locales().timeout(_localeProbeTimeout);
+      debugPrint('STT: locales=${locales.map((l) => l.localeId).toList()}');
+      final has = locales.any((l) => l.localeId.toLowerCase().startsWith('bn'));
+      debugPrint('STT: supportsBangla -> $has');
+      return has;
+    } on TimeoutException {
+      // speech_to_text 7.4.0 never resolves its Android `locales` result on
+      // devices without an on-device recogniser (the plugin only completes
+      // the platform answer inside `isOnDeviceRecognitionAvailable`'s happy
+      // path). Optimistically assume support and let `listen()` report real
+      // failures through its error callback.
+      debugPrint('STT: locales probe timed out — assuming Bangla supported');
+      return true;
+    }
   }
 
   @override
   Future<void> startListening() async {
-    if (_listening || !await _initialize()) return;
+    if (_listening) return;
+    if (!await _initialize()) {
+      debugPrint('STT: startListening aborted — not initialized');
+      return;
+    }
     _listening = true;
+    debugPrint('STT: listen(bn-BD) starting');
     await _speech.listen(
       listenOptions: SpeechListenOptions(
         listenMode: ListenMode.dictation,

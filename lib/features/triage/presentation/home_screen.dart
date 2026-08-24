@@ -298,11 +298,13 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
   void _notifyChanged() => widget.onChanged(_text.text);
 
   Future<void> _toggleListening() async {
+    debugPrint('MIC: tap — isListening=$_isListening');
     if (_isListening) {
       await _stopListening();
       return;
     }
     final mic = await _permission.microphoneStatus();
+    debugPrint('MIC: status=$mic voiceAvailable=$_voiceAvailable');
     if (mic == PermissionState.granted) {
       await _ensureAvailableAndStart();
       return;
@@ -345,6 +347,7 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
   Future<void> _ensureAvailableAndStart() async {
     if (_voiceAvailable == null) {
       final available = await _speech.supportsBangla();
+      debugPrint('MIC: probe -> $available');
       if (!mounted) return;
       setState(() => _voiceAvailable = available);
       if (!available) {
@@ -356,7 +359,10 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
         return;
       }
     }
-    if (_voiceAvailable != true) return;
+    if (_voiceAvailable != true) {
+      debugPrint('MIC: silent return — voiceAvailable=$_voiceAvailable');
+      return;
+    }
     await _startListening();
   }
 
