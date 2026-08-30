@@ -113,6 +113,15 @@ class TriageController extends Notifier<TriageFormState> {
     state = state.copyWith(symptoms: value, clearError: true);
   }
 
+  /// Starts a brand-new conversation: clears the current result, error and the
+  /// symptom text so the initial home state is shown again (like a "new chat"
+  /// button). The cached result is retained — it only re-hydrates when the
+  /// conversation is truly empty, so it will not re-appear until the next
+  /// cold start.
+  void resetConversation() {
+    state = const TriageFormState();
+  }
+
   Future<void> submit() async {
     if (!state.canSubmit) return;
     // Capture the original description before the request so it can be echoed

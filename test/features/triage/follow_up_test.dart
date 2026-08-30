@@ -98,6 +98,9 @@ void main() {
     // correctly sends an empty conversation (valid per the API contract).
     expect(data['turns'], isA<List<dynamic>>());
     expect(data['turns'], isEmpty);
+    // No session_id exists yet on the first follow-up — it must be omitted
+    // from the body rather than sent as null (which the API rejects).
+    expect(data.containsKey('session_id'), isFalse);
 
     // The response's next question replaces the old one in the single block.
     expect(find.text('শ্বাস নিতেও কি কষ্ট হচ্ছে?'), findsOneWidget);
@@ -140,5 +143,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('অন্তত ৩টি অক্ষর লিখুন।'), findsOneWidget);
+  });
+
+  testWidgets('the new-chat floating button clears the conversation', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await submitSymptoms(tester);
+
+    // A result is showing with the follow-up FAB present.
+    expect(find.text(BnStrings.newChatLabel), findsOneWidget);
+    expect(find.text('আপনার কি ঢোক গিলতে খুব কষ্ট হচ্ছে?'), findsOneWidget);
+
+    // Tapping it returns to the initial home entry: no result, no FAB.
+    await tester.tap(find.text(BnStrings.newChatLabel));
+    await tester.pumpAndSettle();
+    expect(find.text(BnStrings.newChatLabel), findsNothing);
+    expect(find.text('আপনার কি ঢোক গিলতে খুব কষ্ট হচ্ছে?'), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
   });
 }

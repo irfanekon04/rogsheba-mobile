@@ -90,6 +90,9 @@ abstract final class BnStrings {
   /// Error shown when the follow-up answer request fails.
   static const answerFailed = 'উত্তর পাঠানো যায়নি। আবার চেষ্টা করুন।';
 
+  /// Floating button to start a brand-new triage conversation.
+  static const newChatLabel = 'নতুন চ্যাট শুরু করুন';
+
   // Spoken-text prefixes, read aloud in the web's order.
   static const ttsAdvicePrefix = 'করণীয়: ';
   static const ttsWarningSignsPrefix = 'বিপদ-সংকেত: ';

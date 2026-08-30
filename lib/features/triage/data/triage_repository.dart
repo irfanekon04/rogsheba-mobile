@@ -30,7 +30,7 @@ class TriageRepository {
     String? sessionId,
   }) async {
     final envelope = await api.post('/triage/followup', {
-      'session_id': sessionId,
+      if (sessionId != null) 'session_id': sessionId,
       'initial_symptoms': initialSymptoms,
       'turns': [for (final t in turns) t.toJson()],
       'answer': answer,

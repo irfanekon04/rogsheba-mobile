@@ -61,6 +61,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         actions: const [HotlinePill()],
       ),
+      floatingActionButton: state.result != null
+          ? _NewChatButton(onPressed: controller.resetConversation)
+          : null,
       body: SafeArea(
         child: Column(
           children: [
@@ -130,16 +133,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           const SizedBox(height: 24),
                           KeyedSubtree(
                             key: _resultKey,
-                            child: TriageResultCard(result: state.result!),
+                            child: TriageResultCard(
+                              result: state.result!,
+                              showFollowUp: state.awaitingAnswer,
+                            ),
                           ),
-                          if (state.result!.followupQuestionBn != null) ...[
-                            const SizedBox(height: 16),
-                            _FollowUpQuestion(result: state.result!),
-                          ],
-                          if (state.awaitingAnswer) ...[
-                            const SizedBox(height: 12),
-                            _FollowUpInput(key: ValueKey(state.result!.turn)),
-                          ],
                         ],
                       ],
                     ),
@@ -709,13 +707,22 @@ class _FeatureItem extends StatelessWidget {
 /// band, TTS, clinics CTA) land with the triage-levels slice; this establishes
 /// the card chrome and the theme-resolved level colouring.
 class TriageResultCard extends StatelessWidget {
-  const TriageResultCard({required this.result, super.key});
+  const TriageResultCard({
+    required this.result,
+    this.showFollowUp = false,
+    super.key,
+  });
 
   final TriageResult result;
+
+  /// True while there is an unanswered follow-up question; the follow-up
+  /// question + answer box are then rendered inline at the foot of this card.
+  final bool showFollowUp;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -753,9 +760,15 @@ class TriageResultCard extends StatelessWidget {
             result.disclaimerBn,
             style: textTheme.bodySmall?.copyWith(
               fontStyle: FontStyle.italic,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: scheme.onSurfaceVariant,
             ),
           ),
+          if (showFollowUp) ...[
+            const Divider(height: 24),
+            _FollowUpQuestion(result: result),
+            const SizedBox(height: 12),
+            _FollowUpInput(key: ValueKey(result.turn)),
+          ],
         ],
       ),
     );
@@ -1030,6 +1043,30 @@ class _FollowUpInputState extends ConsumerState<_FollowUpInput>
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Floating "new chat" button, shown once a triage result exists. Tapping it
+/// clears the current conversation and returns to the initial home entry —
+/// the ChatGPT-style affordance to ask about a brand-new problem.
+class _NewChatButton extends StatelessWidget {
+  const _NewChatButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: BnStrings.newChatLabel,
+      child: FloatingActionButton.extended(
+        onPressed: onPressed,
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        icon: const Icon(Icons.add_comment_outlined),
+        label: const Text(BnStrings.newChatLabel),
+      ),
     );
   }
 }
