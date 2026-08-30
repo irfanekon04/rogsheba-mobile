@@ -53,6 +53,12 @@ class TriageFormState {
       !isAnswerSubmitting &&
       !isSubmitting;
 
+  /// True whenever the latest result still has a pending follow-up question,
+  /// regardless of whether an answer is currently in flight. Used to keep the
+  /// follow-up section (question bubble + shimmer skeleton) visible while the
+  /// AI is thinking.
+  bool get hasPendingQuestion => result?.followupQuestionBn != null;
+
   TriageFormState copyWith({
     String? symptoms,
     bool? isSubmitting,

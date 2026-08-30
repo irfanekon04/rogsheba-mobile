@@ -108,10 +108,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     : null,
                               ),
                               const SizedBox(height: 12),
-                              Text(
-                                BnStrings.inlineDisclaimer,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: scheme.onSurfaceVariant),
+                              Center(
+                                child: Text(
+                                  BnStrings.inlineDisclaimer,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: scheme.error),
+                                ),
                               ),
                               if (state.errorMessage != null) ...[
                                 const SizedBox(height: 12),
@@ -140,11 +142,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             key: _resultKey,
                             child: TriageResultCard(
                               result: state.result!,
-                              showFollowUp: state.awaitingAnswer,
+                              showFollowUp: state.hasPendingQuestion,
                               isAnswerSubmitting: state.isAnswerSubmitting,
                             ),
                           ),
                         ],
+                        const SizedBox(height: 72),
                       ],
                     ),
                   ),
@@ -680,7 +683,6 @@ class _FeatureItem extends StatelessWidget {
     return AppCard(
       padding: const EdgeInsets.all(16),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: scheme.primary, size: 28),
           const SizedBox(width: 12),
@@ -810,9 +812,9 @@ class _FollowUpQuestion extends StatelessWidget {
       children: [
         Text(
           BnStrings.followUpTitle,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Align(
@@ -826,9 +828,9 @@ class _FollowUpQuestion extends StatelessWidget {
             ),
             child: Text(
               question,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurface,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
             ),
           ),
         ),
@@ -991,9 +993,9 @@ class _FollowUpInputState extends ConsumerState<_FollowUpInput>
                     _interim.isEmpty
                         ? BnStrings.listeningIndicator
                         : '${BnStrings.listeningIndicator} $_interim',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: scheme.primary,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: scheme.primary),
                   ),
                 ),
               ],
@@ -1024,11 +1026,7 @@ class _FollowUpInputState extends ConsumerState<_FollowUpInput>
                       if (!_micDenied && (_voiceAvailable ?? true))
                         IconButton(
                           tooltip: BnStrings.answerMicLabel,
-                          icon: Icon(
-                            _isListening
-                                ? Icons.stop
-                                : Icons.mic,
-                          ),
+                          icon: Icon(_isListening ? Icons.stop : Icons.mic),
                           onPressed: _isListening
                               ? _stopListening
                               : _toggleListening,
@@ -1047,10 +1045,9 @@ class _FollowUpInputState extends ConsumerState<_FollowUpInput>
                 const SizedBox(height: 8),
                 Text(
                   error,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: scheme.error),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: scheme.error),
                 ),
               ],
             ],
@@ -1247,10 +1244,7 @@ class _SpeakButtonState extends ConsumerState<_SpeakButton> {
     final scheme = Theme.of(context).colorScheme;
     return TextButton.icon(
       onPressed: _toggle,
-      icon: Icon(
-        _isSpeaking ? Icons.stop : Icons.volume_up,
-        size: 20,
-      ),
+      icon: Icon(_isSpeaking ? Icons.stop : Icons.volume_up, size: 20),
       label: Text(_isSpeaking ? BnStrings.ttsStop : BnStrings.ttsListen),
       style: TextButton.styleFrom(
         minimumSize: const Size(48, 48),
