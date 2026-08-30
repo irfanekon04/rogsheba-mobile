@@ -54,13 +54,13 @@ Future<void> submitSymptoms(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('a follow-up question renders a chat thread and an answer box', (
+  testWidgets('a follow-up question renders a single block and an answer box', (
     tester,
   ) async {
     await pumpApp(tester);
     await submitSymptoms(tester);
 
-    // The initial question appears as an assistant bubble.
+    // The current question appears once in its own bubble.
     expect(find.text('আপনার কি ঢোক গিলতে খুব কষ্ট হচ্ছে?'), findsOneWidget);
     expect(find.text(BnStrings.followUpTitle), findsOneWidget);
 
@@ -99,9 +99,9 @@ void main() {
     expect(data['turns'], isA<List<dynamic>>());
     expect(data['turns'], isEmpty);
 
-    // The response's next question replaces the old one.
+    // The response's next question replaces the old one in the single block.
     expect(find.text('শ্বাস নিতেও কি কষ্ট হচ্ছে?'), findsOneWidget);
-    expect(find.text('আপনার কি ঢোক গিলতে খুব কষ্ট হচ্ছে?'), findsOneWidget);
+    expect(find.text('আপনার কি ঢোক গিলতে খুব কষ্ট হচ্ছে?'), findsNothing);
   });
 
   testWidgets('a failed /triage/followup shows the answer error and keeps text', (

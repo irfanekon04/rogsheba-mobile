@@ -134,10 +134,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                           if (state.result!.followupQuestionBn != null) ...[
                             const SizedBox(height: 16),
-                            _ConversationThread(result: state.result!),
+                            _FollowUpQuestion(result: state.result!),
                           ],
                           if (state.awaitingAnswer) ...[
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                             _FollowUpInput(key: ValueKey(state.result!.turn)),
                           ],
                         ],
@@ -762,31 +762,22 @@ class TriageResultCard extends StatelessWidget {
   }
 }
 
-/// The multi-turn conversation, chat-style: answered assistant questions on
-/// the left, patient answers on the right, and the *current* pending question
-/// as a trailing assistant bubble. The API keeps the answered turns in
-/// `turns` and the next question in `followupQuestionBn` separately, so this
-/// renders both.
-class _ConversationThread extends StatelessWidget {
-  const _ConversationThread({required this.result});
+/// The follow-up question, web-style: a titled block asking the patient one
+/// thing at a time, with the current question rendered in a single bubble. The
+/// API returns the *next* question in `followupQuestionBn` while keeping the
+/// answered history in `turns`; for the mobile UX (mirroring the web) we show
+/// only this one current question, not the whole chat history.
+class _FollowUpQuestion extends StatelessWidget {
+  const _FollowUpQuestion({required this.result});
 
   final TriageResult result;
 
   @override
   Widget build(BuildContext context) {
-    final bubbles = <_MessageBubble>[
-      for (final turn in result.turns) _MessageBubble(turn: turn),
-    ];
-    final pending = result.followupQuestionBn;
-    if (pending != null && pending.trim().isNotEmpty) {
-      bubbles.add(
-        _MessageBubble(
-          turn: TriageTurn(role: 'assistant', text: pending),
-        ),
-      );
-    }
-    if (bubbles.isEmpty) return const SizedBox.shrink();
+    final question = result.followupQuestionBn?.trim() ?? '';
+    if (question.isEmpty) return const SizedBox.shrink();
 
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -797,53 +788,24 @@ class _ConversationThread extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        for (final (index, bubble) in bubbles.indexed) ...[
-          bubble,
-          if (index != bubbles.length - 1) const SizedBox(height: 6),
-        ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 600),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              question,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurface,
+              ),
+            ),
+          ),
+        ),
       ],
-    );
-  }
-}
-
-/// A single chat bubble. Assistant messages sit left with a neutral fill;
-/// patient messages sit right with the primary fill.
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.turn});
-
-  final TriageTurn turn;
-
-  bool get _isAssistant => turn.role == 'assistant';
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isAssistant = _isAssistant;
-    return Align(
-      alignment: isAssistant ? Alignment.centerLeft : Alignment.centerRight,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 600),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isAssistant
-              ? scheme.surfaceContainerHighest
-              : scheme.primaryContainer,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isAssistant ? 2 : 16),
-            bottomRight: Radius.circular(isAssistant ? 16 : 2),
-          ),
-        ),
-        child: Text(
-          turn.text,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: isAssistant
-                ? scheme.onSurface
-                : scheme.onPrimaryContainer,
-          ),
-        ),
-      ),
     );
   }
 }
