@@ -68,7 +68,7 @@ void main() {
   }
 
   testWidgets(
-    'a cached triage result renders read-only with no connectivity',
+    'cached result is not restored on cold start — always fresh home',
     (tester) async {
       final connectivity = FakeConnectivityService(online: false);
       final adapter = await pumpOfflineApp(
@@ -80,16 +80,11 @@ void main() {
         },
       );
 
-      // The cached result renders — nothing lost just because the connection
-      // dropped since the previous session.
-      expect(find.text('গলা ব্যথা ও জ্বর'), findsOneWidget);
-      expect(
-        find.text('আপনার লক্ষণ সম্ভবত গলার সংক্রমণ নির্দেশ করছে।'),
-        findsOneWidget,
-      );
+      // The cached result is NOT restored — the app always starts fresh.
+      expect(find.text('গলা ব্যথা ও জ্বর'), findsNothing);
 
-      // The offline banner explains why a new request will not work.
-      expect(find.text(BnStrings.offlineBanner), findsOneWidget);
+      // The initial home input is shown instead.
+      expect(find.byType(TextField), findsOneWidget);
 
       // Zero requests hit the wire for the whole pump.
       expect(adapter.requests, isEmpty);

@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:developer';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:rogsheba_mobile/core/config/app_config.dart';
 import 'package:rogsheba_mobile/core/l10n/bn_strings.dart';
@@ -24,12 +25,30 @@ class ApiClient {
   /// takes 2–6s, so it is allowed up to 30s before giving up.
   Duration get triageTimeout => _config.triageTimeout;
 
+  void _logRequest(String method, String path, Object? data) {
+    if (!kDebugMode) return;
+    final body = data is Map<String, dynamic> ? jsonEncode(data) : '$data';
+    log('API → $method $path', name: 'ApiClient', error: body);
+  }
+
+  void _logResponse(String method, String path, int? statusCode, String body) {
+    if (!kDebugMode) return;
+    final truncated =
+        body.length > 500 ? '${body.substring(0, 500)}… (truncated)' : body;
+    log(
+      'API ← $method $path [$statusCode]',
+      name: 'ApiClient',
+      error: truncated,
+    );
+  }
+
   Future<Map<String, dynamic>> post(
     String path,
     Object? data, {
     Duration? timeout,
   }) async {
     final effectiveTimeout = timeout ?? _config.defaultTimeout;
+    _logRequest('POST', path, data);
     try {
       final response = await _dio.post<Uint8List>(
         path,
@@ -40,8 +59,11 @@ class ApiClient {
           sendTimeout: effectiveTimeout,
         ),
       );
-      return _decode(response.data, effectiveTimeout);
+      final decoded = _decode(response.data, effectiveTimeout);
+      _logResponse('POST', path, response.statusCode, jsonEncode(decoded));
+      return decoded;
     } on DioException catch (e) {
+      _logResponse('POST', path, e.response?.statusCode, e.message ?? '');
       throw mapDioError(e);
     }
   }
@@ -54,6 +76,7 @@ class ApiClient {
     Duration? timeout,
   }) async {
     final effectiveTimeout = timeout ?? _config.defaultTimeout;
+    _logRequest('GET', path, queryParameters);
     try {
       final response = await _dio.get<Uint8List>(
         path,
@@ -64,8 +87,11 @@ class ApiClient {
           sendTimeout: effectiveTimeout,
         ),
       );
-      return _decode(response.data, effectiveTimeout);
+      final decoded = _decode(response.data, effectiveTimeout);
+      _logResponse('GET', path, response.statusCode, jsonEncode(decoded));
+      return decoded;
     } on DioException catch (e) {
+      _logResponse('GET', path, e.response?.statusCode, e.message ?? '');
       throw mapDioError(e);
     }
   }

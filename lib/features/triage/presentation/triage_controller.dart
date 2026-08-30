@@ -87,26 +87,10 @@ class TriageFormState {
 class TriageController extends Notifier<TriageFormState> {
   @override
   TriageFormState build() {
-    // Cold start must not block on a network call — the cache read is local
-    // and async, and the input field renders immediately regardless. A cached
-    // result fills in as soon as the plugin store is ready.
-    _restoreFromCache();
+    // Always start with a fresh conversation — the app opens to the initial
+    // homescreen every time. The cache is still written for offline viewing
+    // within the same session but is not restored on cold start.
     return const TriageFormState();
-  }
-
-  /// Restores the most recent advice from cache so it is not lost when the
-  /// connection drops. Best-effort: an absent, stale or unreadable cache is
-  /// simply ignored.
-  Future<void> _restoreFromCache() async {
-    try {
-      final cache = await ref.read(cacheServiceProvider.future);
-      final cached = cache.readTriageResult();
-      if (cached != null && state.result == null) {
-        state = state.copyWith(result: cached);
-      }
-    } on Object {
-      // A cache failure must never surface to the user at cold start.
-    }
   }
 
   void onSymptomsChanged(String value) {

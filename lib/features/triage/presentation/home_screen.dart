@@ -20,6 +20,7 @@ import 'package:rogsheba_mobile/shared/widgets/app_card.dart';
 import 'package:rogsheba_mobile/shared/widgets/app_chip.dart';
 import 'package:rogsheba_mobile/shared/widgets/offline_banner.dart';
 import 'package:rogsheba_mobile/shared/widgets/permission_rationale_dialog.dart';
+import 'package:shimmer/shimmer.dart';
 
 /// The home / triage screen, porting the web layout: hero, symptom entry card,
 /// example chips, feature strip and the triage result card. All colours and
@@ -129,6 +130,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           const SizedBox(height: 32),
                           const _FeatureStrip(),
                         ],
+                        if (state.isSubmitting && state.result == null) ...[
+                          const SizedBox(height: 24),
+                          const _TriageSkeleton(),
+                        ],
                         if (state.result != null) ...[
                           const SizedBox(height: 24),
                           KeyedSubtree(
@@ -136,6 +141,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             child: TriageResultCard(
                               result: state.result!,
                               showFollowUp: state.awaitingAnswer,
+                              isAnswerSubmitting: state.isAnswerSubmitting,
                             ),
                           ),
                         ],
@@ -710,6 +716,7 @@ class TriageResultCard extends StatelessWidget {
   const TriageResultCard({
     required this.result,
     this.showFollowUp = false,
+    this.isAnswerSubmitting = false,
     super.key,
   });
 
@@ -718,6 +725,10 @@ class TriageResultCard extends StatelessWidget {
   /// True while there is an unanswered follow-up question; the follow-up
   /// question + answer box are then rendered inline at the foot of this card.
   final bool showFollowUp;
+
+  /// True while a follow-up answer is in flight; a shimmer skeleton replaces
+  /// the input field to signal the AI is thinking.
+  final bool isAnswerSubmitting;
 
   @override
   Widget build(BuildContext context) {
@@ -767,7 +778,10 @@ class TriageResultCard extends StatelessWidget {
             const Divider(height: 24),
             _FollowUpQuestion(result: result),
             const SizedBox(height: 12),
-            _FollowUpInput(key: ValueKey(result.turn)),
+            if (isAnswerSubmitting)
+              const _FollowUpSkeleton()
+            else
+              _FollowUpInput(key: ValueKey(result.turn)),
           ],
         ],
       ),
@@ -1066,6 +1080,109 @@ class _NewChatButton extends StatelessWidget {
         foregroundColor: scheme.onPrimary,
         icon: const Icon(Icons.add_comment_outlined),
         label: const Text(BnStrings.newChatLabel),
+      ),
+    );
+  }
+}
+
+/// Pulsing skeleton placeholder shown while waiting for the AI to respond.
+/// Mirrors the triage result card layout: level badge, title, summary, advice
+/// lines — all as rounded bars that shimmer left-to-right.
+class _TriageSkeleton extends StatelessWidget {
+  const _TriageSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final base = isDark ? const Color(0xFF1A2E30) : const Color(0xFFE0E0E0);
+    final highlight = isDark
+        ? const Color(0xFF2A4042)
+        : const Color(0xFFF5F5F5);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.4)),
+        boxShadow: kShadowSoft,
+      ),
+      child: Shimmer.fromColors(
+        baseColor: base,
+        highlightColor: highlight,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _bar(80, 28, base),
+            const SizedBox(height: 16),
+            _bar(200, 20, base),
+            const SizedBox(height: 8),
+            _bar(280, 16, base),
+            const SizedBox(height: 8),
+            _bar(240, 16, base),
+            const SizedBox(height: 16),
+            _bar(140, 14, base),
+            const SizedBox(height: 8),
+            _bar(260, 14, base),
+            const SizedBox(height: 8),
+            _bar(180, 14, base),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bar(double width, double height, Color color) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+}
+
+/// Smaller shimmer skeleton for the follow-up answer area — mimics the input
+/// field and send button while the AI is processing the patient's reply.
+class _FollowUpSkeleton extends StatelessWidget {
+  const _FollowUpSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final base = isDark ? const Color(0xFF1A2E30) : const Color(0xFFE0E0E0);
+    final highlight = isDark
+        ? const Color(0xFF2A4042)
+        : const Color(0xFFF5F5F5);
+    return Shimmer.fromColors(
+      baseColor: base,
+      highlightColor: highlight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: base,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: 120,
+              height: 40,
+              decoration: BoxDecoration(
+                color: base,
+                borderRadius: BorderRadius.circular(AppRadius.xxxl),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
