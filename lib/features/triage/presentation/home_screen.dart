@@ -140,11 +140,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           const SizedBox(height: 24),
                           KeyedSubtree(
                             key: _resultKey,
-                            child: TriageResultCard(
-                              result: state.result!,
-                              showFollowUp: state.hasPendingQuestion,
-                              isAnswerSubmitting: state.isAnswerSubmitting,
-                            ),
+                            child: state.isAnswerSubmitting
+                                ? const _TriageSkeleton()
+                                : TriageResultCard(
+                                    result: state.result!,
+                                    showFollowUp:
+                                        state.hasPendingQuestion,
+                                  ),
                           ),
                         ],
                         const SizedBox(height: 72),
@@ -273,6 +275,11 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
   /// Android, denied after a re-check on iOS) — the settings route is offered.
   bool _micDenied = false;
 
+  /// Set to `true` while we are programmatically syncing [_text] from
+  /// Riverpod state so that the `_notifyChanged` listener does not echo
+  /// the value back and create a loop.
+  bool _syncingFromState = false;
+
   @override
   void initState() {
     super.initState();
@@ -310,7 +317,10 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
     }
   }
 
-  void _notifyChanged() => widget.onChanged(_text.text);
+  void _notifyChanged() {
+    if (_syncingFromState) return;
+    widget.onChanged(_text.text);
+  }
 
   Future<void> _toggleListening() async {
     if (_isListening) {
@@ -435,6 +445,20 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
 
   @override
   Widget build(BuildContext context) {
+    // Sync the local TextEditingController when an example chip (or anything
+    // outside this widget) updates the Riverpod state's `symptoms`.
+    final stateSymptoms = ref.watch(
+      triageControllerProvider.select((s) => s.symptoms),
+    );
+    if (!_syncingFromState && _text.text != stateSymptoms) {
+      _syncingFromState = true;
+      _text.value = TextEditingValue(
+        text: stateSymptoms,
+        selection: TextSelection.collapsed(offset: stateSymptoms.length),
+      );
+      _syncingFromState = false;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -447,18 +471,13 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
           textInputAction: TextInputAction.newline,
           decoration: InputDecoration(
             hintText: BnStrings.symptomPlaceholder,
-            suffixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_text.text.isNotEmpty && !_isListening)
-                  IconButton(
+            suffixIcon: _text.text.isNotEmpty && !_isListening
+                ? IconButton(
                     tooltip: BnStrings.clearField,
                     icon: const Icon(Icons.close),
                     onPressed: _clear,
-                  ),
-                if (!_micDenied && (_voiceAvailable ?? true)) _buildMicButton(),
-              ],
-            ),
+                  )
+                : null,
           ),
         ),
         if (_isListening)
@@ -511,11 +530,15 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
               ),
             ),
           ),
+        if (!_micDenied && (_voiceAvailable ?? true)) ...[
+          const SizedBox(height: 12),
+          _buildMicPill(),
+        ],
       ],
     );
   }
 
-  Widget _buildMicButton() {
+  Widget _buildMicPill() {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final listening = _isListening;
@@ -527,19 +550,34 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
         excludeSemantics: true,
         child: InkWell(
           onTap: _toggleListening,
-          customBorder: const CircleBorder(),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 48,
-            height: 48,
+          borderRadius: BorderRadius.circular(AppRadius.xxxl),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
               color: listening ? scheme.error : scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(AppRadius.xxxl),
             ),
-            child: Icon(
-              listening ? Icons.stop : Icons.mic,
-              size: 22,
-              color: listening ? scheme.onError : scheme.onPrimaryContainer,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  listening ? Icons.stop : Icons.mic,
+                  size: 20,
+                  color: listening
+                      ? scheme.onError
+                      : scheme.onPrimaryContainer,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  listening ? BnStrings.stopListening : BnStrings.micLabel,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: listening
+                        ? scheme.onError
+                        : scheme.onPrimaryContainer,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -718,7 +756,6 @@ class TriageResultCard extends StatelessWidget {
   const TriageResultCard({
     required this.result,
     this.showFollowUp = false,
-    this.isAnswerSubmitting = false,
     super.key,
   });
 
@@ -727,10 +764,6 @@ class TriageResultCard extends StatelessWidget {
   /// True while there is an unanswered follow-up question; the follow-up
   /// question + answer box are then rendered inline at the foot of this card.
   final bool showFollowUp;
-
-  /// True while a follow-up answer is in flight; a shimmer skeleton replaces
-  /// the input field to signal the AI is thinking.
-  final bool isAnswerSubmitting;
 
   @override
   Widget build(BuildContext context) {
@@ -780,10 +813,7 @@ class TriageResultCard extends StatelessWidget {
             const Divider(height: 24),
             _FollowUpQuestion(result: result),
             const SizedBox(height: 12),
-            if (isAnswerSubmitting)
-              const _FollowUpSkeleton()
-            else
-              _FollowUpInput(key: ValueKey(result.turn)),
+            _FollowUpInput(key: ValueKey(result.turn)),
           ],
         ],
       ),
@@ -1142,49 +1172,6 @@ class _TriageSkeleton extends StatelessWidget {
   }
 }
 
-/// Smaller shimmer skeleton for the follow-up answer area — mimics the input
-/// field and send button while the AI is processing the patient's reply.
-class _FollowUpSkeleton extends StatelessWidget {
-  const _FollowUpSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? const Color(0xFF1A2E30) : const Color(0xFFE0E0E0);
-    final highlight = isDark
-        ? const Color(0xFF2A4042)
-        : const Color(0xFFF5F5F5);
-    return Shimmer.fromColors(
-      baseColor: base,
-      highlightColor: highlight,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            height: 48,
-            decoration: BoxDecoration(
-              color: base,
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              width: 120,
-              height: 40,
-              decoration: BoxDecoration(
-                color: base,
-                borderRadius: BorderRadius.circular(AppRadius.xxxl),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Speaker toggle on the result card header: reads the result aloud in Bangla,
 /// or stops playback when already speaking. As on the web, the button is hidden
 /// entirely when no `bn-BD` voice is installed — Bangla read with an English
@@ -1330,7 +1317,7 @@ class _ClinicsCtaButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.xxxl),
             child: Container(
               constraints: const BoxConstraints(minHeight: 48),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               alignment: Alignment.center,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
