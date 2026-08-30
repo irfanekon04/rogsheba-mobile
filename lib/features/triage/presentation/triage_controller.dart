@@ -2,9 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:rogsheba_mobile/core/l10n/bn_strings.dart';
 import 'package:rogsheba_mobile/core/network/api_exception.dart';
-import 'package:rogsheba_mobile/core/services/cache_service.dart';
-import 'package:rogsheba_mobile/features/triage/data/triage_repository.dart';
 import 'package:rogsheba_mobile/features/triage/domain/triage_result.dart';
+import 'package:rogsheba_mobile/features/triage/triage_providers.dart';
 
 /// State backing the home screen's symptom entry + result.
 class TriageFormState {
@@ -23,9 +22,7 @@ class TriageFormState {
   final TriageResult? result;
 
   /// The original symptom description sent to `/triage`, kept for the life of
-  /// the conversation and echoed to `/triage/followup` on every answer (the
-  /// API is stateless and needs full context each call). `null` until the
-  /// first submit, so follow-up resends are always paired with it.
+  /// the conversation and echoed to `/triage/followup` on every answer.
   final String? initialSymptoms;
 
   /// Already-Bangla message shown verbatim, or `null` when all is well.
@@ -34,29 +31,16 @@ class TriageFormState {
   /// True while a follow-up answer is in flight to the AI.
   final bool isAnswerSubmitting;
 
-  /// Follow-up-specific error message (the main submit keeps [errorMessage]).
+  /// Follow-up-specific error message.
   final String? answerError;
 
-  /// Submit is disabled only while the field is empty or a request is in
-  /// flight (prevents double submission).
   bool get canSubmit => symptoms.trim().isNotEmpty && !isSubmitting;
 
-  /// True while there is an unanswered follow-up question and no request is
-  /// in flight — the answer field + send button are shown only then.
-  ///
-  /// A pending question is signalled by `followupQuestionBn != null`; the
-  /// `isComplete` flag only appears on `/triage/followup` responses (a first
-  /// `/triage` never returns it, so it defaults to true without meaning the
-  /// conversation is over).
   bool get awaitingAnswer =>
       result?.followupQuestionBn != null &&
       !isAnswerSubmitting &&
       !isSubmitting;
 
-  /// True whenever the latest result still has a pending follow-up question,
-  /// regardless of whether an answer is currently in flight. Used to keep the
-  /// follow-up section (question bubble + shimmer skeleton) visible while the
-  /// AI is thinking.
   bool get hasPendingQuestion => result?.followupQuestionBn != null;
 
   TriageFormState copyWith({
@@ -90,44 +74,32 @@ class TriageFormState {
   static const _sentinel = Object();
 }
 
+/// Orchestrates triage form state. Depends only on use cases — never on
+/// repositories, data sources, or infrastructure directly.
 class TriageController extends Notifier<TriageFormState> {
   @override
-  TriageFormState build() {
-    // Always start with a fresh conversation — the app opens to the initial
-    // homescreen every time. The cache is still written for offline viewing
-    // within the same session but is not restored on cold start.
-    return const TriageFormState();
-  }
+  TriageFormState build() => const TriageFormState();
 
   void onSymptomsChanged(String value) {
     state = state.copyWith(symptoms: value, clearError: true);
   }
 
-  /// Starts a brand-new conversation: clears the current result, error and the
-  /// symptom text so the initial home state is shown again (like a "new chat"
-  /// button). The cached result is retained — it only re-hydrates when the
-  /// conversation is truly empty, so it will not re-appear until the next
-  /// cold start.
   void resetConversation() {
     state = const TriageFormState();
   }
 
   Future<void> submit() async {
     if (!state.canSubmit) return;
-    // Capture the original description before the request so it can be echoed
-    // to /triage/followup for the rest of this conversation.
     final initialSymptoms = state.symptoms.trim();
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
-      final result = await ref
-          .read(triageRepositoryProvider)
-          .submitSymptoms(initialSymptoms);
+      final useCase = await ref.read(submitSymptomsUseCaseProvider.future);
+      final result = await useCase(initialSymptoms);
       state = state.copyWith(
         isSubmitting: false,
         result: result,
         initialSymptoms: initialSymptoms,
       );
-      await _persist(result);
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);
     } catch (_) {
@@ -138,11 +110,6 @@ class TriageController extends Notifier<TriageFormState> {
     }
   }
 
-  /// Sends the patient's [answer] to the current follow-up question, then
-  /// replaces the result with the next server response. Level, banner and
-  /// emergency number re-render automatically because the whole result is
-  /// swapped. When the conversation completes (`isComplete`), no further
-  /// question is shown.
   Future<void> submitAnswer(String answer) async {
     final trimmed = answer.trim();
     if (trimmed.isEmpty || !state.awaitingAnswer) return;
@@ -151,14 +118,14 @@ class TriageController extends Notifier<TriageFormState> {
 
     state = state.copyWith(isAnswerSubmitting: true, answerError: null);
     try {
-      final next = await ref.read(triageRepositoryProvider).submitFollowUp(
-            initialSymptoms: state.initialSymptoms ?? '',
-            answer: trimmed,
-            turns: result.turns,
-            sessionId: result.sessionId,
-          );
+      final useCase = await ref.read(submitFollowUpUseCaseProvider.future);
+      final next = await useCase(
+        initialSymptoms: state.initialSymptoms ?? '',
+        answer: trimmed,
+        turns: result.turns,
+        sessionId: result.sessionId,
+      );
       state = state.copyWith(isAnswerSubmitting: false, result: next);
-      await _persist(next);
     } on ApiException catch (e) {
       state =
           state.copyWith(isAnswerSubmitting: false, answerError: e.message);
@@ -167,17 +134,6 @@ class TriageController extends Notifier<TriageFormState> {
         isAnswerSubmitting: false,
         answerError: BnStrings.genericError,
       );
-    }
-  }
-
-  /// Persists the produced result for offline rendering. Symptom text never
-  /// touches the cache — only the API's response does.
-  Future<void> _persist(TriageResult result) async {
-    try {
-      final cache = await ref.read(cacheServiceProvider.future);
-      await cache.saveTriageResult(result);
-    } on Object {
-      // Caching is best-effort; a failed write never fails the submit.
     }
   }
 }
