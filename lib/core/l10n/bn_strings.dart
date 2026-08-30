@@ -74,6 +74,22 @@ abstract final class BnStrings {
   static const ttsListen = 'বাংলায় শুনুন';
   static const ttsStop = 'শোনা বন্ধ';
 
+  // ---- Follow-up questions (multi-turn triage) ----
+  /// Heading above the answer thread once the AI asks its first question.
+  static const followUpTitle = 'আরও কিছু জানতে চাই';
+
+  /// Placeholder inside the follow-up answer field (mirrors the main field).
+  static const answerPlaceholder = 'আপনার উত্তর বাংলায় লিখুন বা বলুন…';
+
+  /// Send/transcribe affordance for the answer field, read aloud for TTS.
+  static const answerSend = 'উত্তর পাঠান';
+
+  /// Mic accessibility label for the answer field.
+  static const answerMicLabel = 'উत्तर বলুন';
+
+  /// Error shown when the follow-up answer request fails.
+  static const answerFailed = 'উত্তর পাঠানো যায়নি। আবার চেষ্টা করুন।';
+
   // Spoken-text prefixes, read aloud in the web's order.
   static const ttsAdvicePrefix = 'করণীয়: ';
   static const ttsWarningSignsPrefix = 'বিপদ-সংকেত: ';

@@ -23,7 +23,7 @@ Port of the RogSheba web app (Bangla AI health triage) to Android + iOS. **UI an
 
 ### Explicitly out of scope for v1
 - Auth / accounts (API is public, no auth; Supabase files in web are unused scaffolding)
-- Multi-turn conversation via the `history` field — `followup_question_bn` is **displayed** for parity but not answerable. Deferred to v1.1.
+- Longer-term conversation history beyond the answerable /triage/followup loop (that loop itself is in scope — see 2A).
 - Push notifications, in-app maps SDK (we deep-link to Google Maps / OSM like web does)
 
 ---
@@ -206,6 +206,7 @@ Phase 4 ──┬── 4A android ─────┐    │
 - [ ] `flutter analyze` clean, tests added, CI green
 - [ ] Works in light **and** dark theme
 - [ ] Loading / empty / error states all handled
+- [ ] Follow-up question answerable: thread renders, answer (typed or voice) posts to `/triage/followup`, result re-renders, loop exits on `is_complete`
 - [ ] Reviewed by the other developer
 
 ---

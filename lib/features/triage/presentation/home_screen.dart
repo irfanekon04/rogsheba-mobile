@@ -132,6 +132,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             key: _resultKey,
                             child: TriageResultCard(result: state.result!),
                           ),
+                          if (state.result!.followupQuestionBn != null) ...[
+                            const SizedBox(height: 16),
+                            _ConversationThread(result: state.result!),
+                          ],
+                          if (state.awaitingAnswer) ...[
+                            const SizedBox(height: 16),
+                            _FollowUpInput(key: ValueKey(state.result!.turn)),
+                          ],
                         ],
                       ],
                     ),
@@ -298,13 +306,11 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
   void _notifyChanged() => widget.onChanged(_text.text);
 
   Future<void> _toggleListening() async {
-    debugPrint('MIC: tap — isListening=$_isListening');
     if (_isListening) {
       await _stopListening();
       return;
     }
     final mic = await _permission.microphoneStatus();
-    debugPrint('MIC: status=$mic voiceAvailable=$_voiceAvailable');
     if (mic == PermissionState.granted) {
       await _ensureAvailableAndStart();
       return;
@@ -347,7 +353,6 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
   Future<void> _ensureAvailableAndStart() async {
     if (_voiceAvailable == null) {
       final available = await _speech.supportsBangla();
-      debugPrint('MIC: probe -> $available');
       if (!mounted) return;
       setState(() => _voiceAvailable = available);
       if (!available) {
@@ -359,10 +364,7 @@ class _VoiceSymptomFieldState extends ConsumerState<_VoiceSymptomField>
         return;
       }
     }
-    if (_voiceAvailable != true) {
-      debugPrint('MIC: silent return — voiceAvailable=$_voiceAvailable');
-      return;
-    }
+    if (_voiceAvailable != true) return;
     await _startListening();
   }
 
@@ -745,13 +747,6 @@ class TriageResultCard extends StatelessWidget {
             for (final sign in result.warningSignsBn)
               Text('• $sign', style: textTheme.bodyMedium),
           ],
-          if (result.followupQuestionBn != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              '${BnStrings.followupPrefix}${result.followupQuestionBn}',
-              style: textTheme.bodyMedium,
-            ),
-          ],
           const _ClinicsCtaButton(),
           const SizedBox(height: 12),
           Text(
@@ -763,6 +758,316 @@ class TriageResultCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The multi-turn conversation, chat-style: answered assistant questions on
+/// the left, patient answers on the right, and the *current* pending question
+/// as a trailing assistant bubble. The API keeps the answered turns in
+/// `turns` and the next question in `followupQuestionBn` separately, so this
+/// renders both.
+class _ConversationThread extends StatelessWidget {
+  const _ConversationThread({required this.result});
+
+  final TriageResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final bubbles = <_MessageBubble>[
+      for (final turn in result.turns) _MessageBubble(turn: turn),
+    ];
+    final pending = result.followupQuestionBn;
+    if (pending != null && pending.trim().isNotEmpty) {
+      bubbles.add(
+        _MessageBubble(
+          turn: TriageTurn(role: 'assistant', text: pending),
+        ),
+      );
+    }
+    if (bubbles.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          BnStrings.followUpTitle,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (final (index, bubble) in bubbles.indexed) ...[
+          bubble,
+          if (index != bubbles.length - 1) const SizedBox(height: 6),
+        ],
+      ],
+    );
+  }
+}
+
+/// A single chat bubble. Assistant messages sit left with a neutral fill;
+/// patient messages sit right with the primary fill.
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({required this.turn});
+
+  final TriageTurn turn;
+
+  bool get _isAssistant => turn.role == 'assistant';
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isAssistant = _isAssistant;
+    return Align(
+      alignment: isAssistant ? Alignment.centerLeft : Alignment.centerRight,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 600),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isAssistant
+              ? scheme.surfaceContainerHighest
+              : scheme.primaryContainer,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isAssistant ? 2 : 16),
+            bottomRight: Radius.circular(isAssistant ? 16 : 2),
+          ),
+        ),
+        child: Text(
+          turn.text,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: isAssistant
+                ? scheme.onSurface
+                : scheme.onPrimaryContainer,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Answer box shown while the AI is waiting for a reply: a single-line field,
+/// a send button, and the mic for voice answers. Mirrors the main field's
+/// voice pattern (rationale gate, live transcript, then commit on send).
+class _FollowUpInput extends ConsumerStatefulWidget {
+  const _FollowUpInput({super.key});
+
+  @override
+  ConsumerState<_FollowUpInput> createState() => _FollowUpInputState();
+}
+
+class _FollowUpInputState extends ConsumerState<_FollowUpInput>
+    with SingleTickerProviderStateMixin {
+  static const _pulseDuration = Duration(milliseconds: 1300);
+
+  final TextEditingController _text = TextEditingController();
+  late final AnimationController _pulse;
+
+  late final SpeechService _speech;
+  late final PermissionService _permission;
+  StreamSubscription<SpeechTranscript>? _subscription;
+
+  bool? _voiceAvailable;
+  bool _isListening = false;
+  String _interim = '';
+
+  /// This answer field intentionally does not offer the settings route (the
+  /// main field does); if the mic is denied it is simply hidden and typing is
+  /// always available.
+  final bool _micDenied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _speech = ref.read(speechServiceProvider);
+    _permission = ref.read(permissionServiceProvider);
+    _pulse = AnimationController(vsync: this, duration: _pulseDuration);
+    _checkVoiceAvailable();
+  }
+
+  Future<void> _checkVoiceAvailable() async {
+    final mic = await _permission.microphoneStatus();
+    if (mic != PermissionState.granted) return;
+    final available = await _speech.supportsBangla();
+    if (mounted) setState(() => _voiceAvailable = available);
+  }
+
+  Future<void> _submit() async {
+    final text = _text.text;
+    await _stopListening();
+    if (text.trim().isNotEmpty) {
+      // On success the result is replaced and `turn` bumps, so this widget is
+      // re-created via its ValueKey with an empty field. On failure the field
+      // keeps the typed answer untouched.
+      await ref.read(triageControllerProvider.notifier).submitAnswer(text);
+    }
+  }
+
+  Future<void> _toggleListening() async {
+    if (_isListening) {
+      await _stopListening();
+      return;
+    }
+    final mic = await _permission.microphoneStatus();
+    if (mic == PermissionState.granted) {
+      await _startListening();
+      return;
+    }
+    final store = await ref.read(permissionRationaleStoreProvider.future);
+    if (!await store.micAccepted()) {
+      if (!mounted) return;
+      final ok = await showPermissionRationaleDialog(
+        context,
+        title: BnStrings.micRationaleTitle,
+        body: BnStrings.micRationaleBody,
+      );
+      if (!ok || !mounted) return;
+      await store.markMicAccepted();
+    }
+    await _startListening();
+  }
+
+  Future<void> _startListening() async {
+    _subscription = _speech.transcripts.listen(_onTranscript);
+    await _speech.startListening();
+    if (mounted) {
+      setState(() {
+        _isListening = true;
+        _interim = '';
+      });
+      unawaited(_pulse.repeat());
+    }
+  }
+
+  void _onTranscript(SpeechTranscript transcript) {
+    if (!mounted) return;
+    if (transcript.isFinal) {
+      _appendTranscript(transcript.text);
+      _stopListening();
+    } else {
+      setState(() => _interim = transcript.text);
+    }
+  }
+
+  void _appendTranscript(String text) {
+    final current = _text.text;
+    final appended = current.trim().isEmpty ? text : '$current $text';
+    _text.value = TextEditingValue(
+      text: appended,
+      selection: TextSelection.collapsed(offset: appended.length),
+    );
+  }
+
+  Future<void> _stopListening() async {
+    unawaited(_subscription?.cancel());
+    _subscription = null;
+    await _speech.stopListening();
+    if (mounted) {
+      setState(() {
+        _isListening = false;
+        _interim = '';
+      });
+      if (_pulse.isAnimating) _pulse.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    _speech.stopListening();
+    _pulse.dispose();
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final submitting = ref.watch(triageControllerProvider).isAnswerSubmitting;
+    final error = ref.watch(triageControllerProvider).answerError;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_isListening)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                _PulsingDot(animation: _pulse),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _interim.isEmpty
+                        ? BnStrings.listeningIndicator
+                        : '${BnStrings.listeningIndicator} $_interim',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: scheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _text,
+                onSubmitted: (_) => _submit(),
+                textInputAction: TextInputAction.send,
+                decoration: InputDecoration(
+                  hintText: BnStrings.answerPlaceholder,
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_text.text.isNotEmpty && !_isListening)
+                        IconButton(
+                          tooltip: BnStrings.clearField,
+                          icon: const Icon(Icons.close),
+                          onPressed: () {
+                            _text.clear();
+                            setState(() {});
+                          },
+                        ),
+                      if (!_micDenied && (_voiceAvailable ?? true))
+                        IconButton(
+                          tooltip: BnStrings.answerMicLabel,
+                          icon: Icon(
+                            _isListening
+                                ? Icons.stop
+                                : Icons.mic,
+                          ),
+                          onPressed: _isListening
+                              ? _stopListening
+                              : _toggleListening,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              AppButton(
+                label: submitting ? BnStrings.submitting : BnStrings.answerSend,
+                isLoading: submitting,
+                onPressed: submitting ? null : _submit,
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  error,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: scheme.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

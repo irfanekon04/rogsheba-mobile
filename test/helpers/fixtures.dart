@@ -56,3 +56,54 @@ const Map<String, dynamic> internalErrorEnvelope = {
     'message': 'সার্ভিসে সাময়িক সমস্যা হয়েছে।',
   },
 };
+
+/// A `/triage/followup` response that asks a second question (conversation
+/// still in progress, one assistant turn + one patient turn so far).
+const Map<String, dynamic> followUpContinueEnvelope = {
+  'success': true,
+  'data': {
+    'level': 'RED',
+    'title_bn': 'তীব্র গলা সংক্রমণ',
+    'summary_bn': 'ঢোক গিলতে তীব্র কষ্ট ও উচ্চ জ্বর — দ্রুত চিকিৎসা প্রয়োজন।',
+    'advice_bn': ['অবিলম্বে নিকটস্থ হাসপাতালে যান'],
+    'warning_signs_bn': ['শ্বাসকষ্ট', 'মুখের লালা ঝরা'],
+    'followup_question_bn': 'শ্বাস নিতেও কি কষ্ট হচ্ছে?',
+    'disclaimer_bn': 'এটি একজন ডাক্তারের পরামর্শের বিকল্প নয়।',
+    'session_id': 'b4b2f0d2-1c9a-4a1f-9f0f-1a2b3c4d5e6f',
+    'turn': 2,
+    'turns': [
+      {'role': 'assistant', 'text': 'আপনার কি ঢোক গিলতে খুব কষ্ট হচ্ছে?'},
+      {'role': 'patient', 'text': 'হ্যাঁ, ঢোক গিলতে খুব কষ্ট হচ্ছে'},
+    ],
+    'is_complete': false,
+    'emergency_number': '999',
+    'created_at': '2026-08-05T15:12:02.117Z',
+  },
+};
+
+/// A `/triage/followup` response that completes the conversation
+/// (`followup_question_bn` is null and `is_complete` is true).
+const Map<String, dynamic> followUpDoneEnvelope = {
+  'success': true,
+  'data': {
+    'level': 'RED',
+    'title_bn': 'তীব্র গলা সংক্রমণ',
+    'summary_bn': 'ঢোক গিলতে তীব্র কষ্ট ও উচ্চ জ্বর — দ্রুত চিকিৎসা প্রয়োজন।',
+    'advice_bn': [
+      'অবিলম্বে নিকটস্থ হাসপাতালে যান',
+      'কিছু খাওয়ার চেষ্টা করবেন না',
+    ],
+    'warning_signs_bn': ['শ্বাসকষ্ট', 'মুখের লালা ঝরা'],
+    'followup_question_bn': null,
+    'disclaimer_bn': 'এটি একজন ডাক্তারের পরামর্শের বিকল্প নয়।',
+    'session_id': 'b4b2f0d2-1c9a-4a1f-9f0f-1a2b3c4d5e6f',
+    'turn': 2,
+    'turns': [
+      {'role': 'assistant', 'text': 'আপনার কি ঢোক গিলতে খুব কষ্ট হচ্ছে?'},
+      {'role': 'patient', 'text': 'হ্যাঁ, ঢোক গিলতে খুব কষ্ট হচ্ছে'},
+    ],
+    'is_complete': true,
+    'emergency_number': '999',
+    'created_at': '2026-08-05T15:12:02.117Z',
+  },
+};

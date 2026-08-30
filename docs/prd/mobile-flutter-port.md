@@ -228,7 +228,7 @@ Two things that might look like seams and deliberately are **not**:
 
 - **Backend changes of any kind.** `/api/public/v1` is complete and stable; if a gap appears it is a separate PRD.
 - **Accounts, authentication, history sync.** The API is public and anonymous, and the Supabase files in the web project are unused scaffolding, not a signal of intent.
-- **Multi-turn conversation.** The API accepts a `history` array and returns `followup_question_bn`, but the web never uses either. Mobile **displays** the follow-up question for parity and does not let the user answer it. Making it answerable is v1.1 and is the single most obvious next feature.
+- **Multi-turn conversation (beyond the follow-up answer box).** Mobile now surfaces the `followup_question_bn` as a chat bubble with a typed or voice answer, sending it to `/triage/followup` and re-rendering until `is_complete`. Anything further — an unbounded historical thread persisted across sessions — remains v1.1.
 - **In-app maps.** We deep-link to Google Maps / OpenStreetMap exactly as the web does. No maps SDK, no API key, no map view.
 - **Push notifications**, medication reminders, appointment booking, doctor chat.
 - **Tablet- and landscape-specific layouts.** Phone portrait is the target; the app must not break in landscape, but it is not optimised for it.

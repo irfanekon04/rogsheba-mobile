@@ -147,7 +147,51 @@ curl -X POST https://project-kitchen-ready.lovable.app/api/public/v1/triage \
 
 ---
 
-## 3. `GET /clinics`
+## 2b. `POST /triage/followup`
+
+Multi-turn follow-up. After `/triage` returns a `followup_question_bn`, send the
+patient's answer here together with the conversation so far. The API
+re-evaluates the triage level with the full context and returns the next
+question (or marks the conversation complete).
+
+The API is *stateless* — the app owns the conversation. Keep the `turns` array
+returned by each response and send it back on the next call.
+
+### Request body
+
+| Field | Type | Required | Rules |
+|---|---|---|---|
+| `initial_symptoms` | string | ✅ | trimmed, 3–2000 chars. The original description sent to `/triage` |
+| `answer` | string | ✅ | trimmed, 1–1000 chars. Patient's answer to the last follow-up question |
+| `turns` | Turn[] | ❌ | max 20, oldest → newest. From the previous response; omit or `[]` on the first follow-up |
+| `session_id` | string | ❌ | 1–100 chars, client-generated (e.g. UUID). Echoed back so you can group turns locally |
+
+`Turn = { "role": "patient" | "assistant", "text": string }` (text 1–1000 chars).
+
+### Response 200
+
+All fields of `/triage` *plus*:
+
+| Field | Type | Notes |
+|---|---|---|
+| `session_id` | string \| null | Echo of the request value |
+| `turn` | integer | Number of turns in the returned `turns` array |
+| `turns` | Turn[] | Updated conversation — store and send back next call |
+| `is_complete` | boolean | `true` when `followup_question_bn` is `null` |
+
+`level` can change between turns (e.g. YELLOW → RED) — the banner and
+`emergency_number` must re-render each time. The flow repeats until
+`is_complete === true`.
+
+### curl
+```bash
+curl -X POST https://project-kitchen-ready.lovable.app/api/public/v1/triage/followup \
+  -H "Content-Type: application/json" \
+  -d '{"initial_symptoms":"৩ দিন ধরে জ্বর ও গলা ব্যথা","turns":[{"role":"assistant","text":"আপনার কি ঢোক গিলতে কষ্ট হচ্ছে?"}],"answer":"হ্যাঁ, খুব কষ্ট হচ্ছে"}'
+```
+
+### Errors
+`400 invalid_json` · `422 validation_failed` · `429 rate_limited` · `502 ai_upstream_error` — same handling as `/triage` (Bangla `error.message` surfaces verbatim, 429 → backoff).
 
 Nearby hospitals/clinics from OpenStreetMap, sorted by distance.
 
