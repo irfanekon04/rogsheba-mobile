@@ -60,6 +60,10 @@ class ClinicMapScreen extends StatelessWidget {
               ),
             ],
           ),
+          SimpleAttributionWidget(
+            source: const Text('© OpenStreetMap contributors'),
+            backgroundColor: scheme.surface.withValues(alpha: 0.8),
+          ),
         ],
       ),
       bottomSheet: Container(
