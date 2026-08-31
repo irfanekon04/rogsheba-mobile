@@ -175,6 +175,7 @@ abstract final class BnStrings {
   /// Settings-route affordance shown after a permission denial, so the user
   /// who changed their mind can reach the OS settings screen.
   static const openSettings = 'সেটিংসে যান';
+  static const close = 'বন্ধ করুন';
 
   /// Inline note under the symptom field when the mic permission was denied —
   /// typing stays fully functional.

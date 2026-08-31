@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:rogsheba_mobile/core/l10n/bn_strings.dart';
 import 'package:rogsheba_mobile/core/services/launcher_service.dart';
@@ -430,8 +431,14 @@ class _ClinicItem extends ConsumerWidget {
                       label: BnStrings.viewOnMap,
                       filled: false,
                       icon: Icons.map_outlined,
-                      onPressed: () => launch(
-                        MapUrls.osmLocation(lat: clinic.lat, lon: clinic.lon),
+                      onPressed: () => context.push(
+                        '/clinic-map',
+                        extra: <String, dynamic>{
+                          'lat': clinic.lat,
+                          'lon': clinic.lon,
+                          'name': clinic.name,
+                          'address': clinic.address,
+                        },
                       ),
                     ),
                     if (clinic.type != null)
