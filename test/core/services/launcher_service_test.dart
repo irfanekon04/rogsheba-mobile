@@ -83,14 +83,10 @@ void main() {
   });
 
   group('MapUrls.osmLocation', () {
-    test('builds the OpenStreetMap pin URL at zoom 17', () {
+    test('builds a geo: URI that opens the device maps app', () {
       final uri = MapUrls.osmLocation(lat: 23.7525, lon: 90.3786);
 
-      expect(
-        uri.toString(),
-        'https://www.openstreetmap.org/?mlat=23.7525&mlon=90.3786'
-        '#map=17/23.7525/90.3786',
-      );
+      expect(uri.toString(), 'geo:23.7525,90.3786?q=23.7525,90.3786');
     });
   });
 

@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -271,10 +270,14 @@ void main() {
         '&origin=23.7806,90.4074&destination=23.7525,90.3786',
       );
 
-      // Tapping ম্যাপে দেখুন navigates to the in-app map screen.
+      // Tapping ম্যাপে দেখুন opens the device maps app via geo: URI.
       await tester.tap(find.text(BnStrings.viewOnMap).first);
       await tester.pumpAndSettle();
-      expect(find.byType(FlutterMap), findsOneWidget);
+      expect(launched, hasLength(2));
+      expect(
+        launched.last.toString(),
+        'geo:23.7525,90.3786?q=23.7525,90.3786',
+      );
     },
   );
 

@@ -31,11 +31,9 @@ abstract final class MapUrls {
     );
   }
 
-  /// Opens the facility's location at level 17 on OpenStreetMap.
+  /// Opens the device's native maps app at the given coordinates.
   static Uri osmLocation({required double lat, required double lon}) {
-    return Uri.parse(
-      'https://www.openstreetmap.org/?mlat=$lat&mlon=$lon#map=17/$lat/$lon',
-    );
+    return Uri.parse('geo:$lat,$lon?q=$lat,$lon');
   }
 }
 
